@@ -1,1 +1,1 @@
-# NewsImagen
+# Newsgen
