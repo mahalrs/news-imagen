@@ -1,0 +1,22 @@
+{
+  "name": "newsgen-crawler",
+  "version": "0.1.0",
+  "description": "Config based news crawler using Puppeteer",
+  "main": "src/index.ts",
+  "scripts": {
+    "compile": "tsc",
+    "build": "npm run compile",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Rajwinder Mahal",
+  "license": "Apache-2.0",
+  "private": true,
+  "dependencies": {
+    "commander": "^10.0.0",
+    "puppeteer": "^19.8.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.4"
+  }
+}
