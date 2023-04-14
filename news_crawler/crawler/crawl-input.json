@@ -1,0 +1,12 @@
+{
+    "crawlName": "local-crawl",
+    "crawlId": "test1",
+    "targetWebsites": {
+        "techcrunch.com": [
+            "/20"
+        ]
+    },
+    "startUrls": [
+        "https://techcrunch.com/"
+    ]
+}
