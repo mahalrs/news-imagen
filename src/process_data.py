@@ -26,6 +26,9 @@ parser.add_argument(
     help=
     'Directory containing VisualNews dataset: articles.tar.gz and origin.tar files'
 )
+parser.add_argument('--dataset_name',
+                    default='visual_news',
+                    help='Directory name to use when saving processed dataset')
 parser.add_argument('--data_root',
                     default='./data',
                     help='Directory to save processed dataset')
@@ -177,12 +180,11 @@ def main():
 
     make_output_dir(args.data_root)
 
-    dataset_name = 'visual-news'
     print('Extracting files...')
-    untar(origin_tar, args.data_root, out_name=dataset_name, gzip=False)
+    untar(origin_tar, args.data_root, out_name=args.dataset_name, gzip=False)
     untar(articles_tar, args.data_root)
 
-    dataset_dir = os.path.join(args.data_root, dataset_name)
+    dataset_dir = os.path.join(args.data_root, args.dataset_name)
     articles_dir = os.path.join(args.data_root, 'articles')
     print('Processing...')
     process_data(dataset_dir, articles_dir)
