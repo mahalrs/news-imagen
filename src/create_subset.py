@@ -71,6 +71,9 @@ def create_subset(dataset_dir, data_filename, size, out_dir):
         shutil.copy(image_src, image_dest)
         shutil.copy(article_src, article_dest)
 
+    with open(os.path.join(out_dir, data_filename), 'w') as f:
+        json.dump(subset, f)
+
 
 def main():
     args = parser.parse_args()
