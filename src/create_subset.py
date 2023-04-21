@@ -29,14 +29,16 @@ parser.add_argument('--data_root',
 parser.add_argument('--subset_name',
                     default='visual_news_mini',
                     help='Name to use when saving subset')
-parser.add_argument('--subset_size',
-                    default=5000,
-                    type=int,
-                    help='Number of images to include in the subset')
+parser.add_argument('--subset_ratio',
+                    default=0.1,
+                    type=float,
+                    help='Ratio of images to include in the subset')
 parser.add_argument('--seed', default=123, type=int, help='Random seed to use')
 
 
-def create_subset(dataset_dir, data_filename, size, out_dir):
+def create_subset(dataset_dir, data_filename, ratio, out_dir):
+    print('Creating subset from', data_filename)
+
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -47,29 +49,41 @@ def create_subset(dataset_dir, data_filename, size, out_dir):
     with open(data_file_path, 'r') as f:
         data = json.load(f)
 
-    assert len(data) >= size, 'subset size must be less than dataset size'
+    random.shuffle(data['train'])
+    random.shuffle(data['val'])
+    random.shuffle(data['test'])
 
-    subset = []
-    for idx in list(set(random.sample(range(0, len(data)), size))):
-        subset.append(data[idx])
+    subset = dict()
+    subset['train'] = data['train'][:int(ratio * len(data['train']))]
+    subset['val'] = data['val'][:int(ratio * len(data['val']))]
+    subset['test'] = data['test'][:int(ratio * len(data['test']))]
 
-    for story in subset:
-        image_src = os.path.join(dataset_dir, story['image_path'][2:])
-        article_src = os.path.join(dataset_dir, story['article_path'][2:])
+    def copy_files(subset_split):
+        for story in subset_split:
+            image_src = os.path.join(dataset_dir, story['image_path'][2:])
+            article_src = os.path.join(dataset_dir, story['article_path'][2:])
 
-        image_dest = os.path.join(out_dir,
-                                  os.path.dirname(story['image_path'][2:]))
-        article_dest = os.path.join(out_dir,
-                                    os.path.dirname(story['article_path'][2:]))
+            image_dest_dir = os.path.join(
+                out_dir, os.path.dirname(story['image_path'][2:]))
+            article_dest_dir = os.path.join(
+                out_dir, os.path.dirname(story['article_path'][2:]))
 
-        if not os.path.exists(image_dest):
-            os.makedirs(image_dest)
+            if not os.path.exists(image_dest_dir):
+                os.makedirs(image_dest_dir)
 
-        if not os.path.exists(article_dest):
-            os.makedirs(article_dest)
+            if not os.path.exists(article_dest_dir):
+                os.makedirs(article_dest_dir)
 
-        shutil.copy(image_src, image_dest)
-        shutil.copy(article_src, article_dest)
+            image_dest = os.path.join(out_dir, story['image_path'][2:])
+            article_dest = os.path.join(out_dir, story['article_path'][2:])
+
+            shutil.copyfile(image_src, image_dest)
+            shutil.copyfile(article_src, article_dest)
+
+    print('Copying files...')
+    copy_files(subset['train'])
+    copy_files(subset['val'])
+    copy_files(subset['test'])
 
     with open(os.path.join(out_dir, data_filename), 'w') as f:
         json.dump(subset, f)
@@ -82,8 +96,8 @@ def main():
     random.seed(args.seed)
 
     out_dir = os.path.join(args.data_root, args.subset_name)
-    create_subset(args.dataset, 'headlines.json', args.subset_size, out_dir)
-    create_subset(args.dataset, 'captions.json', args.subset_size, out_dir)
+    create_subset(args.dataset, 'headlines.json', args.subset_ratio, out_dir)
+    create_subset(args.dataset, 'captions.json', args.subset_ratio, out_dir)
 
     with tarfile.open(f'{out_dir}.tar.gz', 'w:gz') as tar:
         tar.add(out_dir, arcname=args.subset_name)
