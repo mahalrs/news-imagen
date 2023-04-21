@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import pickle
+import random
 import shutil
 import tarfile
 
@@ -26,12 +27,21 @@ parser.add_argument(
     help=
     'Directory containing VisualNews dataset: articles.tar.gz and origin.tar files'
 )
+parser.add_argument('--train_split',
+                    default=0.2,
+                    type=float,
+                    help='Train/test split ratio')
+parser.add_argument('--val_split',
+                    default=0.1,
+                    type=float,
+                    help='Train/val split ratio')
 parser.add_argument('--dataset_name',
                     default='visual_news',
                     help='Directory name to use when saving processed dataset')
 parser.add_argument('--data_root',
                     default='./data',
                     help='Directory to save processed dataset')
+parser.add_argument('--seed', default=123, type=int, help='Random seed to use')
 
 
 def make_output_dir(out_dir):
@@ -167,8 +177,37 @@ def process_data(dataset_dir, articles_dir):
     os.remove(os.path.join(dataset_dir, 'data.json'))
 
 
+def create_split(data_file, split_ratios):
+    with open(data_file, 'r') as f:
+        data = json.load(f)
+
+    random.shuffle(data)
+
+    split_data = dict()
+
+    split_data['dev'] = data[int(len(data) * split_ratios[0]):]
+    split_data['test'] = data[:int(len(data) * split_ratios[0])]
+
+    split_data['train'] = split_data['dev'][
+        int(len(split_data['dev']) * split_ratios[1]):]
+    split_data['val'] = split_data[
+        'dev'][:int(len(split_data['dev']) * split_ratios[1])]
+
+    del split_data['dev']
+    print(data_file)
+    print('  Train:', len(split_data['train']))
+    print('  Val:', len(split_data['val']))
+    print('  Test:', len(split_data['test']))
+
+    with open(data_file, 'w') as f:
+        json.dump(split_data, f)
+
+
 def main():
     args = parser.parse_args()
+
+    # Set the random seed for reproducible experiments
+    random.seed(args.seed)
 
     origin_tar = os.path.join(args.dataset, 'origin.tar')
     assert os.path.exists(origin_tar), f'{origin_tar} does not exist.'
@@ -188,6 +227,12 @@ def main():
     articles_dir = os.path.join(args.data_root, 'articles')
     print('Processing...')
     process_data(dataset_dir, articles_dir)
+
+    print('Creating splits...')
+    create_split(os.path.join(dataset_dir, 'headlines.json'),
+                 (args.train_split, args.val_split))
+    create_split(os.path.join(dataset_dir, 'captions.json'),
+                 (args.train_split, args.val_split))
 
     # cleanup
     shutil.rmtree(os.path.join(args.dataset, 'articles'))

@@ -21,8 +21,8 @@ from PIL import Image
 
 class VQVisualNewsDataset(Dataset):
 
-    def __init__(self, visual_news_dataset_dir, transform):
-        self.image_paths = self.get_image_paths(visual_news_dataset_dir)
+    def __init__(self, visual_news_dataset_dir, split, transform):
+        self.image_paths = self.get_image_paths(visual_news_dataset_dir, split)
         self.transform = transform
 
     def __len__(self):
@@ -38,16 +38,18 @@ class VQVisualNewsDataset(Dataset):
             print(exc)
             return None
 
-    def get_image_paths(self, dataset_dir):
+    def get_image_paths(self, dataset_dir, split):
+        assert split in ['train', 'val', 'test'], f'Invalid split: {split}'
+
         img_paths = []
 
         with open(os.path.join(dataset_dir, 'headlines.json'), 'r') as f:
-            for story in json.load(f):
+            for story in json.load(f)[split]:
                 img_paths.append(
                     os.path.join(dataset_dir, story['image_path'][2:]))
 
         with open(os.path.join(dataset_dir, 'captions.json'), 'r') as f:
-            for story in json.load(f):
+            for story in json.load(f)[split]:
                 img_paths.append(
                     os.path.join(dataset_dir, story['image_path'][2:]))
 
