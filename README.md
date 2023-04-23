@@ -101,7 +101,7 @@ To start training/fine-tuning:
 python trainer_vqgan.py
 
 # OR
-# python trainer_vqgan.py --dataset ./data/visual_news_mini --val_every_n_steps 5 --log_every_n_steps 5 --ckpt_every_n_steps 10
+# python trainer_vqgan.py --dataset ./data/visual_news_mini --val_every_n_steps 100 --log_every_n_steps 100 --epochs 5
 ```
 
 NOTE: If you get a `RuntimeError: tensorflow/compiler/xla/xla_client/computation_client.cc:280 : Missing XLA configuration` error on GCP, just do `pip uninstall torch_xla`.

@@ -66,6 +66,13 @@ parser.add_argument('--accelerator',
 parser.add_argument('--strategy',
                     default='auto',
                     help='Strategy to use for training')
+<<<<<<< HEAD
+=======
+parser.add_argument('--distributed',
+                    default=True,
+                    type=bool,
+                    help='If distributed training, use DistributedSampler')
+>>>>>>> bde10533464c9fe554a6e426cb1d6434f0d59ecf
 parser.add_argument('--epochs',
                     default=12,
                     type=int,
@@ -110,21 +117,33 @@ def main():
     train_set = VQVisualNewsDataset(args.dataset, 'train', transform)
     train_loader = DataLoader(train_set,
                               batch_size=args.train_batch,
+<<<<<<< HEAD
                               shuffle=True,
+=======
+                              shuffle=(not args.distributed),
+>>>>>>> bde10533464c9fe554a6e426cb1d6434f0d59ecf
                               num_workers=args.num_workers,
                               pin_memory=True)
 
     val_set = VQVisualNewsDataset(args.dataset, 'val', transform)
     val_loader = DataLoader(val_set,
                             batch_size=args.val_batch,
+<<<<<<< HEAD
                             shuffle=False,
+=======
+                            shuffle=(not args.distributed),
+>>>>>>> bde10533464c9fe554a6e426cb1d6434f0d59ecf
                             num_workers=args.num_workers,
                             pin_memory=True)
 
     test_set = VQVisualNewsDataset(args.dataset, 'test', transform)
     test_loader = DataLoader(test_set,
                              batch_size=args.test_batch,
+<<<<<<< HEAD
                              shuffle=False,
+=======
+                             shuffle=(not args.distributed),
+>>>>>>> bde10533464c9fe554a6e426cb1d6434f0d59ecf
                              num_workers=args.num_workers,
                              pin_memory=True)
 
