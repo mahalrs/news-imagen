@@ -15,15 +15,12 @@
 import argparse
 import json
 import os
-from data import VQVisualNewsDataset
 import numpy as np
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from PIL import Image
-
 from vqgan.model import VQModel
-from data import VQVisualNewsDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset',
@@ -45,38 +42,22 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
-def encode(dataset_dir, save_dataset_dir):
-    for split in ['train', 'val', 'test']:
-        image_set = VQVisualNewsDataset(dataset_dir, split, transform)
-        with open(os.path.join(dataset_dir, 'headlines.json'), 'r') as f:
-            i = 0
-            for story in json.load(f)[split]:
+def encode(dataset_dir, save_dataset_dir, file_name):
+    with open(os.path.join(dataset_dir, file_name), 'r') as f:
+        data = json.load(f)
+        for split in ['train', 'val', 'test']:
+            for story in data[split]:
                 image_path = os.path.join(dataset_dir, story['image_path'][2:])
                 img = Image.open(image_path).convert('RGB')
                 transformed = transform(img)
                 img_tensor = transform(img).unsqueeze(0)
                 output, loss, info = model.encode(img_tensor)
-                # torch.save(output, os.path.join(save_dataset_dir, f"{story['id']}.pt"))
                 
                 np_encoding = output.detach().numpy()
-                np.save(os.path.join(save_dataset_dir, f"{story['id']}.npy"), np_encoding)
+                story['encoding'] = np_encoding.tolist()
                 
-                #outputs real & decoded images every 20 images for comparision
-                i += 1
-                if i % 20 == 1:
-                    img_tensor = img_tensor / 2 + 0.5 #unnormalize
-                    transforms.ToPILImage()(img_tensor.squeeze(0)).save(
-                        os.path.join(save_dataset_dir, f"{story['id']}_real.jpg"))
-                    decode_test(save_dataset_dir, story['id'])
-                    print(i)
-                    
-def decode_test(save_dataset_dir, story_id):
-    encoding = np.load(os.path.join(save_dataset_dir, f"{story_id}.npy"))
-    encoding = torch.from_numpy(encoding)
-    rec = model.decode(encoding).detach()
-    rec = rec / 2 + 0.5 #unnormalize
-    image = transforms.ToPILImage()(rec.squeeze(0))
-    image.save(os.path.join(save_dataset_dir, f"{story_id}.jpg"))
+        with open(os.path.join(dataset_dir, f"{file_name[:-5]}_encoding.json"), 'w') as f:
+            json.dump(list(data.values()), f)
 
 def main():
     args = parser.parse_args()
@@ -86,8 +67,8 @@ def main():
     torch.set_grad_enabled(False)
     model.eval()
     
-    encode(dataset_dir, save_dataset_dir)
-    # decode_test(save_dataset_dir, 1466837)
+    encode(dataset_dir, save_dataset_dir, 'headlines.json')
+    encode(dataset_dir, save_dataset_dir, 'captions.json')
 
 if __name__ == '__main__':
     main()
