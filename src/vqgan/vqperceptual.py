@@ -44,13 +44,12 @@ class VQLPIPSWithDiscriminator(nn.Module):
                  use_actnorm=False,
                  disc_conditional=False,
                  disc_ndf=64,
-                 disc_loss='hinge',
-                 lpips_ckpt_path=None):
+                 disc_loss='hinge'):
         super().__init__()
         assert disc_loss in ['hinge', 'vanilla']
         self.codebook_weight = codebook_weight
         self.pixel_weight = pixelloss_weight
-        self.perceptual_loss = LPIPS(lpips_ckpt_path=lpips_ckpt_path).eval()
+        self.perceptual_loss = LPIPS().eval()
         self.perceptual_weight = perceptual_weight
 
         self.discriminator = NLayerDiscriminator(
@@ -69,6 +68,9 @@ class VQLPIPSWithDiscriminator(nn.Module):
         self.disc_factor = disc_factor
         self.discriminator_weight = disc_weight
         self.disc_conditional = disc_conditional
+
+    def init_lpips_from_pretrained(self, pretrained_path):
+        self.perceptual_loss = LPIPS(lpips_ckpt_path=pretrained_path).eval()
 
     def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer=None):
         if last_layer is not None:
@@ -138,7 +140,7 @@ class VQLPIPSWithDiscriminator(nn.Module):
             )
 
             log = {
-                '{}/total_loss'.format(split): loss.clone().detach().mean(),
+                '{}/ae_loss'.format(split): loss.clone().detach().mean(),
                 '{}/quant_loss'.format(split): codebook_loss.detach().mean(),
                 '{}/nll_loss'.format(split): nll_loss.detach().mean(),
                 '{}/rec_loss'.format(split): rec_loss.detach().mean(),

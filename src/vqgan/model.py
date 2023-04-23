@@ -8,7 +8,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
+import torchvision
+import lightning.pytorch as pl
 import numpy as np
 
 from .quantize import VectorQuantizer2 as VectorQuantizer
@@ -415,7 +416,7 @@ class Decoder(nn.Module):
         return h
 
 
-class VQModel(nn.Module):
+class VQModel(pl.LightningModule):
 
     def __init__(
             self,
@@ -423,11 +424,14 @@ class VQModel(nn.Module):
             lossconfig,
             n_embed,
             embed_dim,
-            global_step=0,
+            learning_rate,
+            monitor='val/rec_loss',
             remap=None,
             sane_index_shape=False,  # tell vector quantizer to return indices as bhw
     ):
         super().__init__()
+        self.save_hyperparameters()
+
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
         self.loss = VQLPIPSWithDiscriminator(**lossconfig)
@@ -438,7 +442,11 @@ class VQModel(nn.Module):
                                         sane_index_shape=sane_index_shape)
         self.quant_conv = nn.Conv2d(ddconfig['z_channels'], embed_dim, 1)
         self.post_quant_conv = nn.Conv2d(embed_dim, ddconfig['z_channels'], 1)
-        self.global_step = global_step
+        self.learning_rate = learning_rate
+        self.monitor = monitor
+
+        # Important: This property activates manual optimization.
+        self.automatic_optimization = False
 
     def encode(self, x):
         h = self.encoder(x)
@@ -461,128 +469,130 @@ class VQModel(nn.Module):
         dec = self.decode(quant)
         return dec, diff
 
-    def training_step(self, batch, optimizer_idx):
+    def training_step(self, batch, batch_idx):
+        _, _, aeloss, discloss, log_dict_ae, log_dict_disc = self._shared_loss_step(
+            batch, batch_idx, 'train')
+
+        opt_ae, opt_disc = self.optimizers()
+
+        # Optimize autoencoder
+        opt_ae.zero_grad()
+        self.manual_backward(aeloss)
+        opt_ae.step()
+
+        # Optimize discriminator
+        opt_disc.zero_grad()
+        self.manual_backward(discloss)
+        opt_disc.step()
+
+        self.log('train/aeloss',
+                 aeloss,
+                 prog_bar=True,
+                 logger=False,
+                 on_step=True,
+                 on_epoch=True,
+                 sync_dist=True)
+
+        self.log('train/discloss',
+                 discloss,
+                 prog_bar=True,
+                 logger=False,
+                 on_step=True,
+                 on_epoch=True,
+                 sync_dist=True)
+
+        self.log_dict(log_dict_ae,
+                      prog_bar=False,
+                      logger=True,
+                      on_step=True,
+                      on_epoch=True,
+                      sync_dist=True)
+
+        self.log_dict(log_dict_disc,
+                      prog_bar=False,
+                      logger=True,
+                      on_step=True,
+                      on_epoch=True,
+                      sync_dist=True)
+
+    def validation_step(self, batch, batch_idx):
+        return self._shared_eval_step(batch, batch_idx, 'val')
+
+    def test_step(self, batch, batch_idx):
+        return self._shared_eval_step(batch, batch_idx, 'test')
+
+    def _shared_loss_step(self, batch, batch_idx, split):
         xrec, qloss = self(batch)
 
-        if optimizer_idx == 0:
-            # autoencode
-            aeloss, log_dict_ae = self.loss(qloss,
-                                            batch,
-                                            xrec,
-                                            optimizer_idx,
-                                            self.global_step,
-                                            last_layer=self.get_last_layer(),
-                                            split='train')
-
-            # self.log('train/aeloss',
-            #          aeloss,
-            #          prog_bar=True,
-            #          logger=True,
-            #          on_step=True,
-            #          on_epoch=True)
-            # self.log_dict(log_dict_ae,
-            #               prog_bar=False,
-            #               logger=True,
-            #               on_step=True,
-            #               on_epoch=True)
-
-            return aeloss, log_dict_ae
-
-        if optimizer_idx == 1:
-            # discriminator
-            discloss, log_dict_disc = self.loss(
-                qloss,
-                batch,
-                xrec,
-                optimizer_idx,
-                self.global_step,
-                last_layer=self.get_last_layer(),
-                split='train')
-
-            # self.log('train/discloss',
-            #          discloss,
-            #          prog_bar=True,
-            #          logger=True,
-            #          on_step=True,
-            #          on_epoch=True)
-            # self.log_dict(log_dict_disc,
-            #               prog_bar=False,
-            #               logger=True,
-            #               on_step=True,
-            #               on_epoch=True)
-
-            return discloss, log_dict_disc
-
-    def validation_step(self, batch):
-        xrec, qloss = self(batch)
-
+        # autoencoder
         aeloss, log_dict_ae = self.loss(qloss,
                                         batch,
                                         xrec,
                                         0,
                                         self.global_step,
-                                        last_layer=self.get_last_layer(),
-                                        split='val')
+                                        last_layer=self.decoder.conv_out.weight,
+                                        split=split)
 
-        discloss, log_dict_disc = self.loss(qloss,
-                                            batch,
-                                            xrec,
-                                            1,
-                                            self.global_step,
-                                            last_layer=self.get_last_layer(),
-                                            split='val')
+        # discriminator
+        discloss, log_dict_disc = self.loss(
+            qloss,
+            batch,
+            xrec,
+            1,
+            self.global_step,
+            last_layer=self.decoder.conv_out.weight,
+            split=split)
 
-        # rec_loss = log_dict_ae['val/rec_loss']
+        return xrec, qloss, aeloss, discloss, log_dict_ae, log_dict_disc
 
-        # self.log('val/rec_loss',
-        #          rec_loss,
-        #          prog_bar=True,
-        #          logger=True,
-        #          on_step=True,
-        #          on_epoch=True,
-        #          sync_dist=True)
+    def _shared_eval_step(self, batch, batch_idx, split):
+        xrec, _, aeloss, discloss, log_dict_ae, log_dict_disc = self._shared_loss_step(
+            batch, batch_idx, split)
 
-        # self.log('val/aeloss',
-        #          aeloss,
-        #          prog_bar=True,
-        #          logger=True,
-        #          on_step=True,
-        #          on_epoch=True,
-        #          sync_dist=True)
+        self.log_dict(log_dict_ae,
+                      prog_bar=False,
+                      logger=True,
+                      on_step=True,
+                      on_epoch=True,
+                      sync_dist=True)
 
-        # self.log_dict(log_dict_ae)
-        # self.log_dict(log_dict_disc)
+        self.log_dict(log_dict_disc,
+                      prog_bar=False,
+                      logger=True,
+                      on_step=True,
+                      on_epoch=True,
+                      sync_dist=True)
 
-        return aeloss, log_dict_ae, discloss, log_dict_disc
+        self.log_images(batch, xrec, split)
 
-    def get_last_layer(self):
-        return self.decoder.conv_out.weight
+        return aeloss, discloss, log_dict_ae, log_dict_disc
 
-    def step(self):
-        self.global_step += 1
+    def log_images(self, batch, xrec, split):
+        inputs = torchvision.utils.make_grid(batch) / 2 + 0.5  # unnormalize
+        reconstructions = torchvision.utils.make_grid(
+            xrec) / 2 + 0.5  # unnormalize
 
-    def configure_optimizers(self, learning_rate):
+        self.logger.experiment.add_image(f'{split}_{self.global_step}_inputs',
+                                         inputs, self.global_step)
+        self.logger.experiment.add_image(
+            f'{split}_{self.global_step}_reconstructions', reconstructions,
+            self.global_step)
+
+    def configure_optimizers(self):
+        lr = self.learning_rate
         opt_ae = torch.optim.Adam(list(self.encoder.parameters()) +
                                   list(self.decoder.parameters()) +
                                   list(self.quantize.parameters()) +
                                   list(self.quant_conv.parameters()) +
                                   list(self.post_quant_conv.parameters()),
-                                  lr=learning_rate,
+                                  lr=lr,
                                   betas=(0.5, 0.9))
 
         opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(),
-                                    lr=learning_rate,
+                                    lr=lr,
                                     betas=(0.5, 0.9))
 
-        return opt_ae, opt_disc
+        return [opt_ae, opt_disc], []
 
-    @staticmethod
-    def from_checkpoint(path, config):
-        ckpt = torch.load(path, map_location='cpu')
-        sd = ckpt['state_dict']
-
-        model = VQModel(**config)
-        model.load_state_dict(sd, strict=False)
-        model.global_step = ckpt['global_step']
-
-        return model
+    def init_lpips_from_pretrained(self, pretrained_path):
+        self.loss.init_lpips_from_pretrained(pretrained_path)

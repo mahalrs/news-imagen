@@ -18,7 +18,7 @@ class LPIPS(nn.Module):
         super().__init__()
         self.scaling_layer = ScalingLayer()
         self.chns = [64, 128, 256, 512, 512]  # vg16 features
-        self.net = vgg16(pretrained=True, requires_grad=False)
+        self.net = vgg16(weights='DEFAULT', requires_grad=False)
         self.lin0 = NetLinLayer(self.chns[0], use_dropout=use_dropout)
         self.lin1 = NetLinLayer(self.chns[1], use_dropout=use_dropout)
         self.lin2 = NetLinLayer(self.chns[2], use_dropout=use_dropout)
@@ -83,16 +83,16 @@ class NetLinLayer(nn.Module):
         self.model = nn.Sequential(*layers)
 
 
-class vgg16(torch.nn.Module):
+class vgg16(nn.Module):
 
-    def __init__(self, requires_grad=False, pretrained=True):
+    def __init__(self, requires_grad=False, weights='DEFAULT'):
         super(vgg16, self).__init__()
-        vgg_pretrained_features = models.vgg16(pretrained=pretrained).features
-        self.slice1 = torch.nn.Sequential()
-        self.slice2 = torch.nn.Sequential()
-        self.slice3 = torch.nn.Sequential()
-        self.slice4 = torch.nn.Sequential()
-        self.slice5 = torch.nn.Sequential()
+        vgg_pretrained_features = models.vgg16(weights=weights).features
+        self.slice1 = nn.Sequential()
+        self.slice2 = nn.Sequential()
+        self.slice3 = nn.Sequential()
+        self.slice4 = nn.Sequential()
+        self.slice5 = nn.Sequential()
         self.N_slices = 5
         for x in range(4):
             self.slice1.add_module(str(x), vgg_pretrained_features[x])
