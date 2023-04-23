@@ -1,0 +1,9 @@
+torch
+torchvision
+lightning
+tensorboard
+einops
+numpy
+matplotlib
+pillow
+requests

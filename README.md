@@ -1,5 +1,13 @@
 # Newsgen - A Multi-Modal Image Generation Model for News Stories
 
+
+## Install dependencies
+
+```sh
+pip install -r requirements.txt
+```
+
+
 ## Download Data
 
 Newsgen uses VisualNews dataset. It contains a large collection of news stories
@@ -67,6 +75,7 @@ npm run build
 npm run start -- --crawl-config ./crawl-input.json --dir-path ./data
 ```
 
+
 ## Train / Fine-tune VQGAN
 
 Before we train or fine-tune VQGAN, we need to download few pre-trained models.
@@ -96,6 +105,7 @@ python trainer_vqgan.py
 ```
 
 NOTE: If you get a `RuntimeError: tensorflow/compiler/xla/xla_client/computation_client.cc:280 : Missing XLA configuration` error on GCP, just do `pip uninstall torch_xla`.
+
 
 ## Visualization
 
