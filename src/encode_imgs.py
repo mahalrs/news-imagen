@@ -26,9 +26,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset',
                     default='data/visual_news_mini',
                     help='Directory containing VisualNews dataset')
-parser.add_argument('--save_dataset',
-                    default='data/vqgan_encodings',
-                    help='Directory name to use when saving encodings')
 
 
 with open('../src/hparams_vqgan.json', 'r') as f:
@@ -42,11 +39,13 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
-def encode(dataset_dir, save_dataset_dir, file_name):
+def encode(dataset_dir, file_name):
     with open(os.path.join(dataset_dir, file_name), 'r') as f:
         data = json.load(f)
         for split in ['train', 'val', 'test']:
-            for story in data[split]:
+            for i in range(len(data[split])):
+            # for story in data[split]:
+                story = data[split][i]
                 image_path = os.path.join(dataset_dir, story['image_path'][2:])
                 img = Image.open(image_path).convert('RGB')
                 transformed = transform(img)
@@ -57,18 +56,19 @@ def encode(dataset_dir, save_dataset_dir, file_name):
                 story['encoding'] = np_encoding.tolist()
                 
         with open(os.path.join(dataset_dir, f"{file_name[:-5]}_encoding.json"), 'w') as f:
-            json.dump(list(data.values()), f)
+            json.dump(data, f)
 
 def main():
     args = parser.parse_args()
     dataset_dir = args.dataset
-    save_dataset_dir = args.save_dataset
 
     torch.set_grad_enabled(False)
     model.eval()
     
-    encode(dataset_dir, save_dataset_dir, 'headlines.json')
-    encode(dataset_dir, save_dataset_dir, 'captions.json')
+    encode(dataset_dir, 'headlines.json')
+    print("headlines.json encoded")
+    encode(dataset_dir, 'captions.json')
+    print("captions.json encoded")
 
 if __name__ == '__main__':
     main()
