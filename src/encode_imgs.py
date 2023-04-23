@@ -46,6 +46,9 @@ def encode(dataset_dir, file_name):
             for i in range(len(data[split])):
             # for story in data[split]:
                 story = data[split][i]
+                del story["topic"]
+                del story["source"]
+                del story["article_path"]
                 image_path = os.path.join(dataset_dir, story['image_path'][2:])
                 img = Image.open(image_path).convert('RGB')
                 transformed = transform(img)
@@ -53,7 +56,7 @@ def encode(dataset_dir, file_name):
                 output, loss, info = model.encode(img_tensor)
                 
                 np_encoding = output.detach().numpy()
-                story['encoding'] = np_encoding.tolist()
+                story['image_tokens'] = np_encoding.tolist()
                 
         with open(os.path.join(dataset_dir, f"{file_name[:-5]}_encoding.json"), 'w') as f:
             json.dump(data, f)
