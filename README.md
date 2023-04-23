@@ -66,3 +66,41 @@ npm install
 npm run build
 npm run start -- --crawl-config ./crawl-input.json --dir-path ./data
 ```
+
+## Train / Fine-tune VQGAN
+
+Before we train or fine-tune VQGAN, we need to download few pre-trained models.
+
+- Download VQGAN checkpoint pre-trained on ImageNet. See https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/ for more details.
+- Download LPIPS pre-trained model. See https://heibox.uni-heidelberg.de/f/607503859c864bc1b30b for more details.
+
+```sh
+cd src
+mkdir pretrained
+# Move downloaded checkpoints in ./pretrained
+```
+Preprocess the downloaded pre-trained model
+
+``sh
+python process_pretrained_vqgan.py
+python -m lightning.pytorch.utilities.upgrade_checkpoint ./pretrained/vqgan.ckpt
+``
+
+To start training/fine-tuning:
+
+```sh
+python trainer_vqgan.py
+
+# OR
+# python trainer_vqgan.py --dataset ./data/visual_news_mini --val_every_n_steps 5 --log_every_n_steps 5 --ckpt_every_n_steps 10
+```
+
+NOTE: If you get a `RuntimeError: tensorflow/compiler/xla/xla_client/computation_client.cc:280 : Missing XLA configuration` error on GCP, just do `pip uninstall torch_xla`.
+
+## Visualization
+
+By default, VQGAN trainer stores logs to `logs` directory. To visualize in Tensorboard, run:
+
+```sh
+tensorboard --logdir ./logs
+```
