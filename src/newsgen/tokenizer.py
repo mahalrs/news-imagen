@@ -33,7 +33,6 @@ class NewsgenTokenizer():
         self.vqgan.eval()
 
         self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-base')
-        self.tokenizer.to(device)
 
         self.device = device
         self.transform = transforms.Compose([
@@ -43,18 +42,13 @@ class NewsgenTokenizer():
         ])
 
     def encode_text(self, inp):
-        inp = inp.to(self.device)
-
-        return self.tokenizer.encode(inp,
-                                     max_length=1024,
-                                     padding='max_length',
-                                     truncation=True,
-                                     return_tensors='pt')
+        return self.tokenizer(inp,
+                              max_length=1024,
+                              padding='max_length',
+                              truncation=True,
+                              return_tensors='pt')
 
     def encode_text_batch(self, inputs):
-        inputs = torch.tensor(inputs)
-        inputs = inputs.to(self.device)
-
         return self.tokenizer.batch_encode_plus(inputs,
                                                 max_length=1024,
                                                 padding='max_length',
