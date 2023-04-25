@@ -27,14 +27,16 @@ from vqgan.model import VQModel
 
 class NewsgenTokenizer():
 
-    def __init__(self, vqgan_ckpt_path, device='cpu'):
+    def __init__(self, vqgan_ckpt_path, device=None):
+        self.device = device
+
         self.vqgan = VQModel.load_from_checkpoint(vqgan_ckpt_path)
-        self.vqgan.to(device)
+        if device:
+            self.vqgan.to(device)
         self.vqgan.eval()
 
         self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-base')
 
-        self.device = device
         self.transform = transforms.Compose([
             transforms.Resize((256, 256)),
             transforms.ToTensor(),
@@ -57,7 +59,8 @@ class NewsgenTokenizer():
 
     def encode_image(self, image):
         img = self.transform(image).unsqueeze(0)
-        img = img.to(self.device)
+        if self.device:
+            img = img.to(self.device)
 
         with torch.no_grad():
             _, _, info = self.vqgan.encode(img)
@@ -65,7 +68,8 @@ class NewsgenTokenizer():
 
     def encode_image_batch(self, images):
         imgs = torch.stack([self.transform(img) for img in images])
-        imgs = imgs.to(self.device)
+        if self.device:
+            imgs = imgs.to(self.device)
 
         with torch.no_grad():
             _, _, info = self.vqgan.encode(imgs)
@@ -73,7 +77,8 @@ class NewsgenTokenizer():
             return info[2].reshape(-1, 256)
 
     def decode_images(self, logits):
-        logits = logits.to(self.device)
+        if self.device:
+            logits = logits.to(self.device)
 
         # Apply a softmax activation function to the logits tensor
         probs = torch.softmax(logits, dim=-1)
@@ -84,5 +89,7 @@ class NewsgenTokenizer():
         return self.vqgan.decode_code(indices)
 
     def decode_images_code(self, indices):
-        indices = indices.to(self.device)
+        if self.device:
+            indices = indices.to(self.device)
+
         return self.vqgan.decode_code(indices)
