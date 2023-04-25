@@ -86,10 +86,12 @@ class NewsgenTokenizer():
         # Take the index of the maximum value in each probability distribution
         indices = torch.argmax(probs, dim=-1)
 
-        return self.vqgan.decode_code(indices)
+        with torch.no_grad():
+            return self.vqgan.decode_code(indices)
 
     def decode_images_code(self, indices):
         if self.device:
             indices = indices.to(self.device)
 
-        return self.vqgan.decode_code(indices)
+        with torch.no_grad():
+            return self.vqgan.decode_code(indices)
