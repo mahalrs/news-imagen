@@ -8,3 +8,4 @@ matplotlib
 pillow
 requests
 transformers
+tqdm

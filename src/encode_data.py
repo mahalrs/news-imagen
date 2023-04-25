@@ -18,6 +18,7 @@ import os
 import torch
 
 from PIL import Image
+from tqdm import tqdm
 
 from newsgen.tokenizer import NewsgenTokenizer
 
@@ -33,50 +34,52 @@ parser.add_argument('--vqgan_ckpt',
 def encode(dataset_dir, file_name, tok):
     with open(os.path.join(dataset_dir, file_name), 'r') as f:
         data = json.load(f)
-        for split in ['train', 'val', 'test']:
-            for i in range(0, len(data[split]), 4):
-                story_batch = data[split][i:i + 4]
-                headline_batch = []
-                caption_batch = []
-                image_batch = []
 
-                for story in story_batch:
-                    del story['topic']
-                    del story['source']
-                    del story['article_path']
+    pbar = tqdm(total=len(data['train']) + len(data['val']) + len(data['test']))
 
-                    if 'headline' in story:
-                        headline_batch.append(story['headline'])
-                    caption_batch.append(story['caption'])
-                    image_path = os.path.join(dataset_dir,
-                                              story['image_path'][2:])
-                    img = Image.open(image_path).convert('RGB')
-                    image_batch.append(img)
+    for split in ['train', 'val', 'test']:
+        for i in range(0, len(data[split]), 4):
+            story_batch = data[split][i:i + 4]
+            headline_batch = []
+            caption_batch = []
+            image_batch = []
 
-                if len(headline_batch) > 0:
-                    headline_encoding = tok.encode_text_batch(
-                        headline_batch).to('cpu')
-                    headline_tokens = headline_encoding['input_ids']
-                    headline_attention = headline_encoding['attention_mask']
-                caption_encoding = tok.encode_text_batch(caption_batch).to(
+            for story in story_batch:
+                del story['topic']
+                del story['source']
+                del story['article_path']
+
+                if 'headline' in story:
+                    headline_batch.append(story['headline'])
+                caption_batch.append(story['caption'])
+                image_path = os.path.join(dataset_dir, story['image_path'][2:])
+                img = Image.open(image_path).convert('RGB')
+                image_batch.append(img)
+
+            if len(headline_batch) > 0:
+                headline_encoding = tok.encode_text_batch(headline_batch).to(
                     'cpu')
-                caption_tokens = caption_encoding['input_ids']
-                caption_attention = caption_encoding['attention_mask']
-                image_encoding = tok.encode_image_batch(image_batch).to('cpu')
+                headline_tokens = headline_encoding['input_ids']
+                headline_attention = headline_encoding['attention_mask']
+            caption_encoding = tok.encode_text_batch(caption_batch).to('cpu')
+            caption_tokens = caption_encoding['input_ids']
+            caption_attention = caption_encoding['attention_mask']
+            image_encoding = tok.encode_image_batch(image_batch).to('cpu')
 
-                for j in range(len(story_batch)):
-                    story = story_batch[j]
-                    if len(headline_batch) > 0:
-                        story['headline_tokens'] = headline_tokens[j].tolist()
-                        story['headline_attention'] = headline_attention[
-                            j].tolist()
-                    story['caption_tokens'] = caption_tokens[j].tolist()
-                    story['caption_attention'] = caption_attention[j].tolist()
-                    story['image_tokens'] = image_encoding[j].tolist()
+            for j in range(len(story_batch)):
+                story = story_batch[j]
+                if len(headline_batch) > 0:
+                    story['headline_tokens'] = headline_tokens[j].tolist()
+                    story['headline_attention'] = headline_attention[j].tolist()
+                story['caption_tokens'] = caption_tokens[j].tolist()
+                story['caption_attention'] = caption_attention[j].tolist()
+                story['image_tokens'] = image_encoding[j].tolist()
 
-        with open(os.path.join(dataset_dir, f'{file_name[:-5]}_encoding.json'),
-                  'w') as f:
-            json.dump(data, f)
+            pbar.update(4)
+    pbar.close()
+
+    with open(os.path.join(dataset_dir, f'encoded_{file_name}'), 'w') as f:
+        json.dump(data, f)
 
 
 def main():
