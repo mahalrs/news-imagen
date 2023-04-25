@@ -33,6 +33,8 @@ class NewsgenTokenizer():
         self.vqgan = VQModel.load_from_checkpoint(vqgan_ckpt_path)
         if device:
             self.vqgan.to(device)
+        for param in self.vqgan.parameters():
+            param.requires_grad = False
         self.vqgan.eval()
 
         self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
