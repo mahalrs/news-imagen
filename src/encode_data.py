@@ -24,6 +24,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset',
                     default='data/visual_news_mini',
                     help='Directory containing VisualNews dataset')
+parser.add_argument('--ckpt',
+                    default='../src/pretrained/exp1.ckpt',
+                    help='Path to VQGAN checkpoint for tokenizer')
 
 def encode(dataset_dir, file_name, tok):
     with open(os.path.join(dataset_dir, file_name), 'r') as f:
@@ -48,13 +51,13 @@ def encode(dataset_dir, file_name, tok):
                     image_batch.append(img)
                 
                 if len(headline_batch) > 0:
-                    headline_encoding = tok.encode_text_batch(headline_batch)
+                    headline_encoding = tok.encode_text_batch(headline_batch).to("cpu")
                     headline_tokens = headline_encoding['input_ids']
                     headline_attention = headline_encoding['attention_mask']
-                caption_encoding = tok.encode_text_batch(caption_batch)
+                caption_encoding = tok.encode_text_batch(caption_batch).to("cpu")
                 caption_tokens = caption_encoding['input_ids']
                 caption_attention = caption_encoding['attention_mask']
-                image_encoding = tok.encode_image_batch(image_batch)
+                image_encoding = tok.encode_image_batch(image_batch).to("cpu")
                 
                 for j in range(len(story_batch)):
                     story = story_batch[j]
@@ -74,8 +77,12 @@ def main():
     assert os.path.exists(dataset_dir), f'{dataset_dir} does not exist.'
     assert os.path.isdir(dataset_dir), f'{dataset_dir} is not a directory.'
     
+    ckpt_path = args.ckpt
+    assert os.path.exists(ckpt_path), f'{ckpt_path} does not exist.'
+    assert os.path.isfile(ckpt_path), f'{ckpt_path} is not a file.'
+    
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    tok = NewsgenTokenizer('../src/pretrained/exp1.ckpt', device)
+    tok = NewsgenTokenizer(ckpt_path, device)
     
     encode(dataset_dir, 'headlines.json', tok)
     print("headlines.json encoded")
