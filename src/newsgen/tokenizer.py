@@ -88,3 +88,7 @@ class NewsgenTokenizer():
         indices = torch.argmax(probs, dim=-1)
 
         return self.vqgan.decode_code(indices)
+
+    def decode_images_code(self, indices):
+        indices = indices.to(self.device)
+        return self.vqgan.decode_code(indices)
