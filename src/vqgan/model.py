@@ -572,7 +572,8 @@ class VQModel(pl.LightningModule):
                       on_epoch=True,
                       sync_dist=True)
 
-        self.log_images(batch, xrec, split)
+        if batch_idx % 1000 == 0:
+            self.log_images(batch, xrec, split)
 
         return aeloss, discloss, log_dict_ae, log_dict_disc
 
