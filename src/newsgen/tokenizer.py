@@ -35,7 +35,7 @@ class NewsgenTokenizer():
             self.vqgan.to(device)
         self.vqgan.eval()
 
-        self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-base')
+        self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
         self.transform = transforms.Compose([
             transforms.Resize((256, 256)),
