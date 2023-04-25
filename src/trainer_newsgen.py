@@ -33,6 +33,10 @@ parser.add_argument('--dataset',
 parser.add_argument('--encoded_data_file',
                     default='encoded_captions.json',
                     help='Name of file with encoded data')
+parser.add_argument('--train_headlines',
+                    default=False,
+                    type=bool,
+                    help='Whether to use headlines or captions as inputs')
 parser.add_argument('--log_dir',
                     default='./logs',
                     help='Directory to save logs')
@@ -101,7 +105,7 @@ def main():
     assert os.path.isdir(args.dataset), f'{args.dataset} is not a directory.'
 
     train_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                         'train')
+                                         'train', args.train_headlines)
     train_loader = DataLoader(train_set,
                               batch_size=args.train_batch,
                               shuffle=(not args.distributed),
@@ -109,7 +113,7 @@ def main():
                               pin_memory=True)
 
     val_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                       'val')
+                                       'val', args.train_headlines)
     val_loader = DataLoader(val_set,
                             batch_size=args.val_batch,
                             shuffle=(not args.distributed),
@@ -117,7 +121,7 @@ def main():
                             pin_memory=True)
 
     test_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                        'test')
+                                        'test', args.train_headlines)
     test_loader = DataLoader(test_set,
                              batch_size=args.test_batch,
                              shuffle=(not args.distributed),
