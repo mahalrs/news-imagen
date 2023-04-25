@@ -1,0 +1,20 @@
+{
+    "learning_rate": 5e-3,
+    "monitor": "val_loss",
+    "freeze_encoder": true,
+    "decoder_config": {
+        "vocab_size": 16386,
+        "max_position_embeddings": 258,
+        "decoder_layerdrop": 0.0,
+        "activation_function": "gelu",
+        "attention_dropout": 0.0,
+        "activation_dropout": 0.0,
+        "dropout": 0.1,
+        "pad_token_id": 1,
+        "bos_token_id": 0,
+        "eos_token_id": 2,
+        "is_encoder_decoder": true,
+        "forced_eos_token_id": 2,
+        "scale_embedding": false
+    }
+}

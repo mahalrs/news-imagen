@@ -80,8 +80,11 @@ class NewsgenTokenizer():
         if self.device:
             logits = logits.to(self.device)
 
+        # Remove BOS and EOS tokens from the logits tensor
+        logits_without_bos_eos = logits[:, 1:-1, :]
+
         # Apply a softmax activation function to the logits tensor
-        probs = torch.softmax(logits, dim=-1)
+        probs = torch.softmax(logits_without_bos_eos, dim=-1)
 
         # Take the index of the maximum value in each probability distribution
         indices = torch.argmax(probs, dim=-1)
@@ -92,6 +95,10 @@ class NewsgenTokenizer():
     def decode_images_code(self, indices):
         if self.device:
             indices = indices.to(self.device)
+
+        # Remove BOS and EOS tokens from the logits tensor
+        if indices.shape[1] == 258:
+            indices = indices[:, 1:-1]
 
         with torch.no_grad():
             return self.vqgan.decode_code(indices)
