@@ -15,6 +15,7 @@
 import json
 import os
 
+import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -54,3 +55,45 @@ class VQVisualNewsDataset(Dataset):
                     os.path.join(dataset_dir, story['image_path'][2:]))
 
         return img_paths
+
+
+class EncodedVisualNewsDataset(Dataset):
+
+    def __init__(self,
+                 visual_news_dataset_dir,
+                 encoded_data_file,
+                 split,
+                 headlines=False):
+        self.data = self.get_data(visual_news_dataset_dir, encoded_data_file,
+                                  split, headlines)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        item = self.data[idx]
+        return item[0], item[1], item[2]
+
+    def get_data(self, dataset_dir, encoded_data_file, split, headlines=False):
+        assert split in ['train', 'val', 'test'], f'Invalid split: {split}'
+
+        data = []
+
+        with open(os.path.join(dataset_dir, encoded_data_file), 'r') as f:
+            for story in json.load(f)[split]:
+                item = []
+                if headlines:
+                    item.append(torch.tensor(story['headline_tokens']))
+                    item.append(torch.tensor(story['headline_attention']))
+                else:
+                    item.append(torch.tensor(story['caption_tokens']))
+                    item.append(torch.tensor(story['caption_attention']))
+
+                img_tokens = [0]
+                img_tokens.extend(story['image_tokens'])
+                img_tokens.append(2)
+                item.append(torch.tensor(img_tokens))
+
+                data.append(item)
+
+        return data
