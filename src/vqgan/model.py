@@ -5,6 +5,8 @@
 #
 # For license & copyright details visit https://github.com/CompVis/taming-transformers
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -459,8 +461,15 @@ class VQModel(pl.LightningModule):
         dec = self.decoder(quant)
         return dec
 
-    def decode_code(self, code_b):
-        quant_b = self.quantize.embed_code(code_b)
+    def decode_code(self, indices):
+        # indices are expected to be of shape (batch, num_tokens)
+        # get quantized latent vectors
+        batch, num_tokens = indices.shape
+        quant_b = self.quantize.embedding(indices)
+        quant_b = quant_b.reshape(batch, int(math.sqrt(num_tokens)),
+                                  int(math.sqrt(num_tokens)), -1)
+        quant_b = quant_b.permute(0, 3, 1, 2).contiguous()
+
         dec = self.decode(quant_b)
         return dec
 
