@@ -25,11 +25,7 @@ parser.add_argument('--dataset',
                     default='data/visual_news_mini',
                     help='Directory containing VisualNews dataset')
 
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-tok = NewsgenTokenizer('../src/pretrained/exp1.ckpt', device)
-
-def encode(dataset_dir, file_name):
+def encode(dataset_dir, file_name, tok):
     with open(os.path.join(dataset_dir, file_name), 'r') as f:
         data = json.load(f)
         for split in ['train', 'val', 'test']:
@@ -52,15 +48,21 @@ def encode(dataset_dir, file_name):
                     image_batch.append(img)
                 
                 if len(headline_batch) > 0:
-                    headline_encoding = tok.encode_text_batch(headline_batch)['input_ids']
-                caption_encoding = tok.encode_text_batch(caption_batch)['input_ids']
+                    headline_encoding = tok.encode_text_batch(headline_batch)
+                    headline_tokens = headline_encoding['input_ids']
+                    headline_attention = headline_encoding['attention_mask']
+                caption_encoding = tok.encode_text_batch(caption_batch)
+                caption_tokens = caption_encoding['input_ids']
+                caption_attention = caption_encoding['attention_mask']
                 image_encoding = tok.encode_image_batch(image_batch)
                 
                 for j in range(len(story_batch)):
                     story = story_batch[j]
                     if len(headline_batch) > 0:
-                        story['headline_tokens'] = headline_encoding[j].tolist()
-                    story['caption_tokens'] = caption_encoding[j].tolist()
+                        story['headline_tokens'] = headline_tokens[j].tolist()
+                        story['headline_attention'] = headline_attention[j].tolist()
+                    story['caption_tokens'] = caption_tokens[j].tolist()
+                    story['caption_attention'] = caption_attention[j].tolist()
                     story['image_tokens'] = image_encoding[j].tolist()
                 
         with open(os.path.join(dataset_dir, f"{file_name[:-5]}_encoding.json"), 'w') as f:
@@ -69,12 +71,15 @@ def encode(dataset_dir, file_name):
 def main():
     args = parser.parse_args()
     dataset_dir = args.dataset
-
-    torch.set_grad_enabled(False)
+    assert os.path.exists(dataset_dir), f'{dataset_dir} does not exist.'
+    assert os.path.isdir(dataset_dir), f'{dataset_dir} is not a directory.'
     
-    encode(dataset_dir, 'headlines.json')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    tok = NewsgenTokenizer('../src/pretrained/exp1.ckpt', device)
+    
+    encode(dataset_dir, 'headlines.json', tok)
     print("headlines.json encoded")
-    encode(dataset_dir, 'captions.json')
+    encode(dataset_dir, 'captions.json', tok)
     print("captions.json encoded")
 
 if __name__ == '__main__':
