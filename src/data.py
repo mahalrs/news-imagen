@@ -77,7 +77,7 @@ class EncodedVisualNewsDataset(Dataset):
         with open(encoded_dataset, 'r') as f:
             for story in json.load(f)[split]:
                 item = []
-                item.append(torch.tensor(story['input_ids']))
+                item.append(torch.tensor(story['input_tokens']))
                 item.append(torch.tensor(story['attention_mask']))
                 item.append(torch.tensor([BOS_TOKEN] + story['labels']))
 
