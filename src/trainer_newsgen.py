@@ -15,7 +15,6 @@
 import argparse
 import json
 import os
-import time
 
 import lightning.pytorch as pl
 
@@ -130,7 +129,7 @@ def main():
     test_set = EncodedVisualNewsDataset(args.encoded_dataset, 'test')
     test_loader = DataLoader(test_set,
                              batch_size=args.test_batch,
-                             shuffle=(not args.distributed),
+                             shuffle=False,
                              num_workers=args.num_workers,
                              pin_memory=True)
 
@@ -180,16 +179,7 @@ def main():
     # Save model
     trainer.save_checkpoint(os.path.join(args.ckpt_dir, 'last.ckpt'))
 
-    # Delete the trainer to free up memory
-    del trainer
-    time.sleep(10)
-
     # Test model
-    trainer = Trainer(accelerator=args.accelerator,
-                      devices=1,
-                      num_nodes=1,
-                      logger=logger)
-
     trainer.test(model, dataloaders=test_loader)
 
 
