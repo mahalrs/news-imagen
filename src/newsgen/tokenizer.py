@@ -45,6 +45,13 @@ class NewsgenTokenizer():
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
 
+        self.ignore_tokens = [
+            16384,  # decoder start token
+            16385,  # bos token
+            16386,  # eos token
+            16387,  # pad token
+        ]
+
     def encode_text(self, inp):
         return self.tokenizer(inp,
                               max_length=1024,
@@ -82,14 +89,19 @@ class NewsgenTokenizer():
         if self.device:
             logits = logits.to(self.device)
 
-        # Remove BOS token from the logits tensor
-        logits_without_bos_eos = logits[:, 1:, :]
-
         # Apply a softmax activation function to the logits tensor
-        probs = torch.softmax(logits_without_bos_eos, dim=-1)
+        probs = torch.softmax(logits, dim=-1)
+
+        # Create a mask to ignore special tokens
+        mask = torch.zeros_like(probs)
+        for token in self.ignore_tokens:
+            mask[:, :, token] = -float('inf')
+
+        # Apply the mask to the probabilities
+        probs = probs + mask
 
         # Take the index of the maximum value in each probability distribution
-        indices = torch.argmax(probs, dim=-1)
+        indices = torch.argmax(probs, dim=-1)[:, :-1]
 
         with torch.no_grad():
             return self.vqgan.decode_code(indices)

@@ -51,7 +51,7 @@ class NewsgenBase(pl.LightningModule):
         # New linear layer to project the decoder output to the vocabulary
         self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
 
-        self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.CrossEntropyLoss(ignore_index=config.pad_token_id)
 
         self.learning_rate = hparams['learning_rate']
         self.warmup_steps = hparams['warmup_steps']
@@ -91,6 +91,7 @@ class NewsgenBase(pl.LightningModule):
         lm_logits = self.lm_head(last_hidden_state)
         # skip bias
 
+        # Cross entropy loss ignores padding tokens
         loss = self.loss(lm_logits.view(-1, lm_logits.shape[-1]),
                          labels.view(-1))
 
