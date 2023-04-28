@@ -15,6 +15,7 @@
 import json
 import os
 
+import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -76,9 +77,9 @@ class EncodedVisualNewsDataset(Dataset):
         with open(encoded_dataset, 'r') as f:
             for story in json.load(f)[split]:
                 item = []
-                item.append(story['input_tokens'])
-                item.append(story['attention_mask'])
-                item.append([BOS_TOKEN] + story['labels'])
+                item.append(torch.tensor(story['input_ids']))
+                item.append(torch.tensor(story['attention_mask']))
+                item.append(torch.tensor([BOS_TOKEN] + story['labels']))
 
                 data.append(item)
 

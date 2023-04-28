@@ -3,7 +3,7 @@
     "monitor": "val_loss",
     "freeze_encoder": true,
     "decoder_config": {
-        "vocab_size": 16385,
+        "vocab_size": 16386,
         "max_position_embeddings": 257,
         "decoder_layerdrop": 0.0,
         "activation_function": "gelu",
