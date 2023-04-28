@@ -177,6 +177,12 @@ def main():
                 train_dataloaders=train_loader,
                 val_dataloaders=val_loader)
 
+    # Save model
+    trainer.save_checkpoint(os.path.join(args.ckpt_dir, 'last.ckpt'))
+
+    # Delete the trainer to free up memory
+    del trainer
+
     # Test model
     trainer = Trainer(accelerator=args.accelerator,
                       devices=1,
@@ -184,9 +190,6 @@ def main():
                       logger=logger)
 
     trainer.test(model, dataloaders=test_loader)
-
-    # Save model
-    trainer.save_checkpoint(os.path.join(args.ckpt_dir, 'last.ckpt'))
 
 
 if __name__ == '__main__':
