@@ -15,8 +15,8 @@
 import argparse
 import json
 import os
+import time
 
-import torch
 import lightning.pytorch as pl
 
 from torch.utils.data import DataLoader
@@ -182,6 +182,7 @@ def main():
 
     # Delete the trainer to free up memory
     del trainer
+    time.sleep(10)
 
     # Test model
     trainer = Trainer(accelerator=args.accelerator,
