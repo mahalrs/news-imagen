@@ -14,12 +14,11 @@
 
 import copy
 
-import torch
 import torch.nn as nn
 import lightning.pytorch as pl
 import torchvision
 
-from transformers import BartForConditionalGeneration, BartConfig, get_linear_schedule_with_warmup
+from transformers import BartForConditionalGeneration, BartConfig, AdamW, get_linear_schedule_with_warmup
 from .tokenizer import NewsgenTokenizer
 
 
@@ -44,6 +43,8 @@ class NewsgenBase(pl.LightningModule):
         config.update(hparams['decoder_config'])
         config = BartConfig(**config)
 
+        self.decoder_start_token_id = config.decoder_start_token_id
+
         model = BartForConditionalGeneration(config=config)
         self.decoder = model.get_decoder()
 
@@ -61,29 +62,36 @@ class NewsgenBase(pl.LightningModule):
         # Important: This property activates manual optimization.
         self.automatic_optimization = False
 
-    def init_tokenizer(self, vqgan_ckpt_path):
-        self.tokenizer = NewsgenTokenizer(vqgan_ckpt_path, device=self.device)
+    def init_tokenizer(self, vqgan_ckpt_path, hparams):
+        self.tokenizer = NewsgenTokenizer(vqgan_ckpt_path,
+                                          hparams=hparams,
+                                          device=self.device)
 
     def encode(self, input_ids, attention_mask):
         return self.encoder(input_ids=input_ids, attention_mask=attention_mask)
 
-    def decode(self, decoder_input_ids, decoder_attention_mask,
-               encoder_hidden_states, encoder_attention_mask):
+    def decode(self, decoder_input_ids, encoder_hidden_states,
+               encoder_attention_mask):
         return self.decoder(input_ids=decoder_input_ids,
-                            attention_mask=decoder_attention_mask,
                             encoder_hidden_states=encoder_hidden_states,
                             encoder_attention_mask=encoder_attention_mask)
 
-    def forward(self, input_ids, attention_mask, decoder_input_ids,
-                decoder_attention_mask, labels):
+    def forward(self, input_ids, attention_mask, labels):
         encoder_outputs = self.encode(input_ids, attention_mask)
-        decoder_outputs = self.decode(decoder_input_ids, decoder_attention_mask,
-                                      encoder_outputs[0], attention_mask)
+
+        # Shift labels one token to the right
+        decoder_input_ids = labels.new_zeros(labels.shape)
+        decoder_input_ids[:, 1:] = labels[:, :-1].clone()
+        decoder_input_ids[:, 0] = self.decoder_start_token_id
+
+        decoder_outputs = self.decode(decoder_input_ids, encoder_outputs[0],
+                                      attention_mask)
 
         last_hidden_state = decoder_outputs[0]
         lm_logits = self.lm_head(last_hidden_state)
         # skip bias
 
+        # Cross entropy loss ignores padding tokens
         loss = self.loss(lm_logits.view(-1, lm_logits.shape[-1]),
                          labels.view(-1))
 
@@ -140,18 +148,15 @@ class NewsgenBase(pl.LightningModule):
         return loss, logits
 
     def _shared_eval_step(self, batch, batch_idx, phase, log_images=False):
-        src_ids, src_mask = batch[0], batch[1]
-        tgt_ids, tgt_mask = batch[2], None
+        input_ids, input_mask, labels = batch
 
         # Run the model and get the loss and logits
-        loss, logits = self(src_ids,
-                            attention_mask=src_mask,
-                            decoder_input_ids=tgt_ids,
-                            decoder_attention_mask=tgt_mask,
-                            labels=tgt_ids)
+        loss, logits = self(input_ids=input_ids,
+                            attention_mask=input_mask,
+                            labels=labels)
 
-        if batch_idx % 1000 == 0 and log_images:
-            self.log_images(tgt_ids, logits, phase)
+        if batch_idx % 100 == 0 and log_images:
+            self.log_images(labels, logits, phase)
 
         return loss, logits
 
@@ -171,7 +176,7 @@ class NewsgenBase(pl.LightningModule):
             self.global_step)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = AdamW(self.parameters(), lr=self.learning_rate)
         lr_scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=self.warmup_steps,

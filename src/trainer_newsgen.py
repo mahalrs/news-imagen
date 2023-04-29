@@ -16,7 +16,6 @@ import argparse
 import json
 import os
 
-import torch
 import lightning.pytorch as pl
 
 from torch.utils.data import DataLoader
@@ -27,19 +26,15 @@ from newsgen.base_model import NewsgenBase
 from data import EncodedVisualNewsDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset',
-                    default='./data/visual_news',
-                    help='Directory containing VisualNews dataset')
-parser.add_argument('--encoded_data_file',
-                    default='encoded_captions.json',
-                    help='Name of file with encoded data')
-parser.add_argument('--train_headlines',
-                    default=False,
-                    type=bool,
-                    help='Whether to use headlines or captions as inputs')
+parser.add_argument('--encoded_dataset',
+                    default='./data/visual_news/encoded_headlines.json',
+                    help='Json file containing encoded VisualNews dataset')
 parser.add_argument('--log_dir',
                     default='./logs',
                     help='Directory to save logs')
+parser.add_argument('--exp_name',
+                    default='newsgen_exp1',
+                    help='Experiment name to use to save logs')
 parser.add_argument('--ckpt_dir',
                     default='./checkpoints/newsgen',
                     help='Directory to save checkpoints')
@@ -49,6 +44,17 @@ parser.add_argument('--hparams',
 parser.add_argument('--vqgan_ckpt',
                     default='./pretrained/vqgan.ckpt',
                     help='Path to VQGAN checkpoint')
+parser.add_argument('--vqgan_hparams',
+                    default='./hparams_vqgan.json',
+                    help='Path to vqgan hparams json file')
+parser.add_argument('--warmup_steps',
+                    default=4000,
+                    type=int,
+                    help='LR scheduler warmup steps')
+parser.add_argument('--total_steps',
+                    default=40000,
+                    type=int,
+                    help='Total training steps')
 parser.add_argument('--train_batch',
                     default=8,
                     type=int,
@@ -73,11 +79,11 @@ parser.add_argument('--distributed',
                     type=bool,
                     help='If distributed training, use DistributedSampler')
 parser.add_argument('--epochs',
-                    default=12,
+                    default=5,
                     type=int,
                     help='Number of epochs to train')
 parser.add_argument('--val_every_n_steps',
-                    default=10000,
+                    default=3000,
                     type=int,
                     help='Perform validation every n steps and save checkpoint')
 parser.add_argument('--log_every_n_steps',
@@ -101,35 +107,34 @@ def main():
         hparams = json.load(f)
 
     # Load dataset
-    assert os.path.exists(args.dataset), f'{args.dataset} does not exist.'
-    assert os.path.isdir(args.dataset), f'{args.dataset} is not a directory.'
+    assert os.path.exists(
+        args.encoded_dataset), f'{args.encoded_dataset} does not exist.'
+    assert os.path.isfile(
+        args.encoded_dataset), f'{args.encoded_dataset} is not a file.'
 
-    train_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                         'train', args.train_headlines)
+    train_set = EncodedVisualNewsDataset(args.encoded_dataset, 'train')
     train_loader = DataLoader(train_set,
                               batch_size=args.train_batch,
                               shuffle=(not args.distributed),
                               num_workers=args.num_workers,
                               pin_memory=True)
 
-    val_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                       'val', args.train_headlines)
+    val_set = EncodedVisualNewsDataset(args.encoded_dataset, 'val')
     val_loader = DataLoader(val_set,
                             batch_size=args.val_batch,
                             shuffle=(not args.distributed),
                             num_workers=args.num_workers,
                             pin_memory=True)
 
-    test_set = EncodedVisualNewsDataset(args.dataset, args.encoded_data_file,
-                                        'test', args.train_headlines)
+    test_set = EncodedVisualNewsDataset(args.encoded_dataset, 'test')
     test_loader = DataLoader(test_set,
                              batch_size=args.test_batch,
-                             shuffle=(not args.distributed),
+                             shuffle=False,
                              num_workers=args.num_workers,
                              pin_memory=True)
 
     # Define logger and checkpoint callback
-    logger = TensorBoardLogger(args.log_dir, name='newsgen')
+    logger = TensorBoardLogger(args.log_dir, name=args.exp_name)
 
     ckpt_callback = pl.callbacks.ModelCheckpoint(
         dirpath=args.ckpt_dir,
@@ -137,20 +142,25 @@ def main():
         save_last=True,
         save_top_k=-1)
 
-    # lr_scheduler
-    total_steps = len(train_loader) * args.epochs
-    warmup_steps = int(0.1 * total_steps)
-    hparams['warmup_steps'] = warmup_steps
-    hparams['training_steps'] = total_steps
-    print(f'Warmup steps: {warmup_steps}')
-    print(f'Total steps: {total_steps}')
+    # Learning rate scheduler config
+    hparams['warmup_steps'] = args.warmup_steps
+    hparams['training_steps'] = args.total_steps
+
+    # Load vqgan hparams
+    assert os.path.exists(
+        args.vqgan_hparams), f'{args.vqgan_hparams} does not exist.'
+    assert os.path.isfile(
+        args.vqgan_hparams), f'{args.vqgan_hparams} is not a file.'
+
+    with open(args.vqgan_hparams, 'r') as f:
+        vqgan_hparams = json.load(f)
 
     # Load model
     assert os.path.exists(args.vqgan_ckpt), f'{args.vqgan_ckpt} does not exist.'
     assert os.path.isfile(args.vqgan_ckpt), f'{args.vqgan_ckpt} is not a file.'
 
     model = NewsgenBase(hparams)
-    model.init_tokenizer(args.vqgan_ckpt)
+    model.init_tokenizer(args.vqgan_ckpt, vqgan_hparams)
 
     # Load trainer
     trainer = Trainer(max_epochs=args.epochs,
@@ -166,16 +176,11 @@ def main():
                 train_dataloaders=train_loader,
                 val_dataloaders=val_loader)
 
-    # Test model
-    trainer = Trainer(accelerator=args.accelerator,
-                      devices=1,
-                      num_nodes=1,
-                      logger=logger)
-
-    trainer.test(model, dataloaders=test_loader)
-
     # Save model
     trainer.save_checkpoint(os.path.join(args.ckpt_dir, 'last.ckpt'))
+
+    # Test model
+    trainer.test(model, dataloaders=test_loader)
 
 
 if __name__ == '__main__':
