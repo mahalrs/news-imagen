@@ -9,3 +9,5 @@ pillow
 requests
 transformers
 tqdm
+torchmetrics
+lpips
