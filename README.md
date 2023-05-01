@@ -1,4 +1,6 @@
-# Newsgen - A Multi-Modal Image Generation Model for News Stories
+# Newsgen - Multi-Modal Image Generation for News Stories
+
+This repository contains source code for various experiments to explore the feasibility of using a multi-modal approach, inspired by DALL-E mini, to generate images using news headlines and captions. The model is trained on a dataset of news articles with the corresponding images.
 
 
 ## Install dependencies
@@ -107,10 +109,47 @@ python trainer_vqgan.py
 NOTE: If you get a `RuntimeError: tensorflow/compiler/xla/xla_client/computation_client.cc:280 : Missing XLA configuration` error on GCP, just do `pip uninstall torch_xla`.
 
 
-## Visualization
+### Visualization
 
 By default, VQGAN trainer stores logs to `logs` directory. To visualize in Tensorboard, run:
 
 ```sh
 tensorboard --logdir ./logs
 ```
+
+
+### Evaluate VQGAN
+
+To evaluate the fine-tuned VQGAN, run the following Jupyter notebook:
+`./notebooks/eval_vqgan.ipynb`
+
+
+## Train BART Decoder
+
+Before we train the decoder, let's encode our dataset to speed up the training.
+
+``sh
+python encode_data.py
+``
+
+To start training:
+
+```sh
+cd src
+
+python trainer_newsgen.py --epochs 5 --warmup_steps 4000 --total_steps 40000
+```
+
+### Visualization
+
+By default, the trainer stores logs to `logs` directory. To visualize in Tensorboard, run:
+
+```sh
+tensorboard --logdir ./logs
+```
+
+
+### Evaluate the Decoder
+
+To evaluate the decoder, run the following Jupyter notebook:
+`./notebooks/eval_decoder.ipynb`
