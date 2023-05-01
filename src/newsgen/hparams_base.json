@@ -1,5 +1,5 @@
 {
-    "learning_rate": 5e-3,
+    "learning_rate": 5e-5,
     "monitor": "val_loss",
     "freeze_encoder": true,
     "decoder_config": {

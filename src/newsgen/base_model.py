@@ -14,6 +14,7 @@
 
 import copy
 
+import torch
 import torch.nn as nn
 import lightning.pytorch as pl
 import torchvision
@@ -44,6 +45,8 @@ class NewsgenBase(pl.LightningModule):
         config = BartConfig(**config)
 
         self.decoder_start_token_id = config.decoder_start_token_id
+        self.pad_token_id = config.pad_token_id
+        self.bos_token_id = config.bos_token_id
 
         model = BartForConditionalGeneration(config=config)
         self.decoder = model.get_decoder()
@@ -96,6 +99,28 @@ class NewsgenBase(pl.LightningModule):
                          labels.view(-1))
 
         return loss, lm_logits
+
+    def generate(self, input_ids, attention_mask):
+        encoder_outputs = self.encode(input_ids, attention_mask)
+        decoder_input_ids = torch.ones((input_ids.shape[0], 257),
+                                       dtype=torch.int).to(self.device)
+        decoder_input_ids *= self.pad_token_id
+        decoder_input_ids[:, 0] = self.bos_token_id
+
+        generated_tokens = torch.zeros((input_ids.shape[0], 256),
+                                       dtype=torch.int).to(self.device)
+
+        for i in range(1, 257):
+            decoder_outputs = self.decode(decoder_input_ids, encoder_outputs[0],
+                                          attention_mask)
+            last_hidden_state = decoder_outputs[0]
+            lm_logits = self.lm_head(last_hidden_state)
+
+            next_token = self.tokenizer.get_indices(lm_logits)[:, i - 1]
+            generated_tokens[:, i - 1] = next_token
+            decoder_input_ids[:, i] = next_token
+
+        return generated_tokens
 
     def training_step(self, batch, batch_idx):
         loss, _ = self._shared_eval_step(batch, batch_idx, 'train')

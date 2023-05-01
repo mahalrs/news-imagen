@@ -106,6 +106,26 @@ class NewsgenTokenizer():
         with torch.no_grad():
             return self.vqgan.decode_code(indices)
 
+    def get_indices(self, logits):
+        if self.device:
+            logits = logits.to(self.device)
+
+        # Apply a softmax activation function to the logits tensor
+        probs = torch.softmax(logits, dim=-1)
+
+        # Create a mask to ignore special tokens
+        mask = torch.zeros_like(probs)
+        for token in self.ignore_tokens:
+            mask[:, :, token] = -float('inf')
+
+        # Apply the mask to the probabilities
+        probs = probs + mask
+
+        # Take the index of the maximum value in each probability distribution
+        indices = torch.argmax(probs, dim=-1)[:, :-1]
+
+        return indices
+
     def decode_images_code(self, indices):
         if self.device:
             indices = indices.to(self.device)
